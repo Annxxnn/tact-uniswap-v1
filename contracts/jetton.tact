@@ -49,7 +49,11 @@ trait Jetton with Ownable {
                     from: myAddress(),
                     response_destination: response_destination,
                     forward_ton_amount: 0,
-                    forward_payload: emptySlice()
+                    forward_payload: emptySlice(),
+                    //////
+                    minliquidity_tokenssold: 0,
+                    maxtokens_minton: 0,
+                    recipient: contractAddress(winit)
                 }.toCell(),
                 code: winit.code,
                 data: winit.data
@@ -138,7 +142,10 @@ contract JettonDefaultWallet
                     from: self.owner,
                     response_destination: msg.response_destination,
                     forward_ton_amount: msg.forward_ton_amount,
-                    forward_payload: msg.forward_payload
+                    forward_payload: msg.forward_payload,
+                    minliquidity_tokenssold: msg.minliquidity_tokenssold,
+                    maxtokens_minton: msg.maxtokens_minton,
+                    recipient: msg.recipient
                 }.toCell(),
                 code: init.code,
                 data: init.data
@@ -176,7 +183,10 @@ contract JettonDefaultWallet
                         queryId: msg.queryId,
                         amount: msg.amount,
                         from: msg.from,
-                        forward_payload: msg.forward_payload
+                        forward_payload: msg.forward_payload,
+                        minliquidity_tokenssold: msg.minliquidity_tokenssold,
+                        maxtokens_minton: msg.maxtokens_minton,
+                        recipient: msg.recipient
                     }.toCell()
                 }
             );
@@ -261,6 +271,10 @@ message(0xf8a7ea5) TokenTransfer {
     custom_payload: Cell?;
     forward_ton_amount: Int as coins;
     forward_payload: Slice as remaining; // Comment Text message when Transfer the jetton
+    /////
+    minliquidity_tokenssold: Int;
+    maxtokens_minton: Int;
+    recipient: Address;
 }
 message(0x178d4519) TokenTransferInternal {
     queryId: Int as uint64;
@@ -269,12 +283,20 @@ message(0x178d4519) TokenTransferInternal {
     response_destination: Address?;
     forward_ton_amount: Int as coins;
     forward_payload: Slice as remaining; // Comment Text message when Transfer the jetton
+    /////
+    minliquidity_tokenssold: Int;
+    maxtokens_minton: Int;
+    recipient: Address;
 }
 message(0x7362d09c) TokenNotification {
     queryId: Int as uint64;
     amount: Int as coins;
     from: Address;
     forward_payload: Slice as remaining; // Comment Text message when Transfer the jetton
+    //////
+    minliquidity_tokenssold: Int;
+    maxtokens_minton: Int;
+    recipient: Address;
 }
 message(0x595f07bc) TokenBurn {
     queryId: Int as uint64;

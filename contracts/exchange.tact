@@ -30,6 +30,18 @@ message TokenToExchangeAddress {
     tokenAddr: Address;
     exchangeAddr: Address;
 }
+message TonToTolenSwapIutput {
+    min_tokens: Int;
+}
+message TokenToTonTransferInput {
+    tokens_sold: Int;
+    min_ton: Int;
+    recipient: Address;
+}
+message TokenToTonSwapInput {
+    tokens_sold: Int;
+    min_ton: Int;
+}
 
 //jetton master wallet
 contract Exchange with Deployable, Jetton {
@@ -122,7 +134,7 @@ contract Exchange with Deployable, Jetton {
             );
             //得到factory合约中token对应的exchange地址,确保获取到的交易所地址等于当前合约地址。
             //self.factory.getExchange(token_addr)
-            require(self.getTokenToExchangeAddress(token_addr) == myAddress());
+            require(self.getTokenToExchangeAddress(self.tokenAddress) == myAddress(), "invalid exchange address");
             let token_amount: Int = msg.max_tokens;
             let initial_liquidity: Int = myBalance();
             //trait jetton 已经更新过了
@@ -276,7 +288,12 @@ contract Exchange with Deployable, Jetton {
     }
     //get 还是 receive？？？
 
-    get fun tonToTolenSwapIutput(min_tokens: Int): Int {
+    // get fun tonToTolenSwapIutput(min_tokens: Int): Int {
+    //     let ctx: Context = context();
+    //     return self.tonToTokenInput(ctx.value, min_tokens, ctx.sender, ctx.sender);
+    // }
+
+     fun _tonToTolenSwapIutput(min_tokens: Int): Int {
         let ctx: Context = context();
         return self.tonToTokenInput(ctx.value, min_tokens, ctx.sender, ctx.sender);
     }
@@ -287,12 +304,16 @@ contract Exchange with Deployable, Jetton {
         return self.tonToTokenInput(ctx.value, min_tokens, ctx.sender, recipient);
     }
 
-    get fun tonToTokenTransferInput(min_tokens: Int, recipient: Address): Int {
-        return self._tonToTokenTransferInput(min_tokens, recipient);
-    }
+    // get fun tonToTokenTransferInput(min_tokens: Int, recipient: Address): Int {
+    //     return self._tonToTokenTransferInput(min_tokens, recipient);
+    // }
 
     receive(msg: TonToTokenTransferInput){
         let tokens_bought: Int = self._tonToTokenTransferInput(msg.min_tokens, msg.recipient);
+    }
+
+    receive(msg: TonToTolenSwapIutput){
+        let tokens_bought: Int = self._tonToTokenTransferInput(msg.min_tokens);
     }
 
     ////////////////////////////////////////
@@ -372,15 +393,23 @@ contract Exchange with Deployable, Jetton {
         return ton_bought;
     }
 
-    get fun tokenToTonSwapInput(tokens_sold: Int, min_ton: Int): Int {
+     fun _tokenToTonSwapInput(tokens_sold: Int, min_ton: Int): Int {
         let ctx: Context = context();
         return self.tokenToTonInput(token_sold, min_ton, ctx.sender, ctx.sender);
     }
 
-    get fun tokenToTonTransferInput(tokens_sold: Int, min_ton: Int, recipient: Address): Int {
+     fun _tokenToTonTransferInput(tokens_sold: Int, min_ton: Int, recipient: Address): Int {
         let ctx: Context = context();
         require(recipient != myAddress() && recipient != newAddress(0, 0));
         return self.tokenToTonInput(tokens_sold, min_ton, ctx.sender, recipient);
+    }
+
+    receive(msg: TokenToTonTransferInput){
+        let tokens_bought: Int = self._tonToTokenTransferInput(msg.tokens_sold, msg.min_ton, msg.recipient);
+    }
+
+    receive(msg: TokenToTonSwapInput){
+        let tokens_bought: Int = self._tonToTokenTransferInput(msg.tokens_sold, msg.min_ton);
     }
 
     ////////////////////////////////
