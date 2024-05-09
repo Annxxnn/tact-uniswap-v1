@@ -7,13 +7,6 @@ message CreateExchange {
 message InitializeFactory {
     template: Address;
 }
-message GetExchangeAddress {
-    tokenAddr: Address;
-}
-message TokenToExchangeAddress {
-    tokenAddr: Address;
-    exchangeAddr: Address;
-}
 
 // message NewExchangeNotification {
 //     toeknAddress: Address;
@@ -26,15 +19,9 @@ contract Factory with Deployable {
     tokenToExchange: map<Address, Address>;
     exchangeToToken: map<Address, Address>;
     idToToken: map<Int, Address>;
-    //uni token content
-    content: Cell;
-    init(content: Cell){
+    init(){
         self.exchangeTemplate = newAddress(0, 0);
         self.tokenCount = 0;
-        self.content = content;
-        // self.tokenToExchange = emptyMap();
-        // self.exchangeToToken = emptyMap();
-        // self.idToToken = emptyMap();
     }
 
     receive(msg: InitializeFactory){
@@ -48,7 +35,7 @@ contract Factory with Deployable {
         require(self.tokenToExchange.get(msg.tokenAddress) == newAddress(0, 0), "exchange already exists");
         let einit: StateInit = initOf Exchange(msg.tokenAddress, myAddress(), self.content);
         let exchangeAddress: Address = contractAddress(einit);
-        send(SendParamters{
+        send(SendParameters{
                 to: exchangeAddress,
                 value: ton("0.1"),
                 mode: SendIgnoreErrors,
@@ -58,7 +45,7 @@ contract Factory with Deployable {
             }
         );
         // if(msg.response_address != null){
-        //     send(SendParamters{
+        //     send(SendParameters{
         //         to:myAddress(),
         //         value:0,
         //         mode: SendIgnoreErrors,
@@ -76,7 +63,7 @@ contract Factory with Deployable {
     receive(msg: GetExchangeAddress){
         let ctx: Context = context();
         let exchange_addr: Address = tokenToExchange.get(msg.token_addr);
-        send(SendParamters{
+        send(SendParameters{
                 to: ctx.sender,
                 value: 0,
                 mode: SendIgnoreErrors,

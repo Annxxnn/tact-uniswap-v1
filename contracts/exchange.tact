@@ -92,7 +92,7 @@ contract Exchange with Deployable, Jetton {
                 "Does not meet the requirements"
             );
             // Add Liquidity(mint LP token to the address that the owner is the message sender)
-            // send(SendParamters{});
+            // send(SendParameters{});
             let liquidityToekn_address: Address = self.getwalletaddress(ctx.sender);
             //to: Address, amount: Int, response_destination: Address
             self.mint(ctx.sender, liquidity_minted, myAddress());
@@ -107,30 +107,31 @@ contract Exchange with Deployable, Jetton {
             //trait jetton 已经更新过了
             //self.totalSupply = (total_liquidity + liquidity_minted);
             // send token to the contract from the message sender?????
-            let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
-            send(SendParamters{
-                    to: contractAddress(init),
-                    value: 0,
-                    mode: SendIgnoreErrors,
-                    //这个消息需要权限，发不出去
-                    body: TokenTransfer{
-                        queryId: msg.queryId,
-                        amount: token_amount,
-                        destination: myAddress(),
-                        response_destination: myAddress(),
-                        custom_payload: emptyCell(),
-                        forward_ton_amount: 0,
-                        forward_payload: emptySlice()
-                    }.toCell(),
-                    code: init.code,
-                    data: init.data
-                }
-            );
+            // let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
+            // send(SendParameters{
+            //         to: contractAddress(init),
+            //         value: 0,
+            //         mode: SendIgnoreErrors,
+            //         //这个消息需要权限，发不出去
+            //         body: TokenTransfer{
+            //             queryId: msg.queryId,
+            //             amount: token_amount,
+            //             destination: myAddress(),
+            //             response_destination: myAddress(),
+            //             custom_payload: emptyCell(),
+            //             forward_ton_amount: 0,
+            //             forward_payload: emptySlice()
+            //         }.toCell(),
+            //         code: init.code,
+            //         data: init.data
+            //     }
+            // );
             self.tokenReserve += token_amount;
         } else {
             require(self.factoryAddress != newAddress(0, 0) &&
                     self.tokenAddress != newAddress(0, 0) &&
-                    ctx.value >= 1000000000
+                    ctx.value >= 1000000000,
+                "invalid address"
             );
             //得到factory合约中token对应的exchange地址,确保获取到的交易所地址等于当前合约地址。
             //self.factory.getExchange(token_addr)
@@ -143,25 +144,25 @@ contract Exchange with Deployable, Jetton {
             self.balances.set(ctx.sender, initial_liquidity);
             // send token to the contract from the message sender????
             // send TokenTransfer message
-            let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
-            send(SendParamters{
-                    to: contractAddress(init),
-                    value: 0,
-                    mode: SendIgnoreErrors,
-                    //这个消息需要权限，发不出去
-                    body: TokenTransfer{
-                        queryId: msg.queryId,
-                        amount: token_amount,
-                        destination: myAddress(),
-                        response_destination: myAddress(),
-                        custom_payload: emptyCell(),
-                        forward_ton_amount: 0,
-                        forward_payload: emptySlice()
-                    }.toCell(),
-                    code: init.code,
-                    data: init.data
-                }
-            );
+            // let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
+            // send(SendParameters{
+            //         to: contractAddress(init),
+            //         value: 0,
+            //         mode: SendIgnoreErrors,
+            //         //这个消息需要权限，发不出去
+            //         body: TokenTransfer{
+            //             queryId: msg.queryId,
+            //             amount: token_amount,
+            //             destination: myAddress(),
+            //             response_destination: myAddress(),
+            //             custom_payload: emptyCell(),
+            //             forward_ton_amount: 0,
+            //             forward_payload: emptySlice()
+            //         }.toCell(),
+            //         code: init.code,
+            //         data: init.data
+            //     }
+            // );
             self.tokenReserve += token_amount;
         }
     }
@@ -180,13 +181,13 @@ contract Exchange with Deployable, Jetton {
         require(ton_amount >= msg.min_ton && token_amount >= msg.min_tokens, "Does not meet the requirements");
         //扣除balances结构中对应地址的lptoken
         let liquidityToekn_address: Address = self.getwalletaddress(ctx.sender);
-        let balance: Int = self.balances.get(liquidityToekn_address);
+        let balance: Int = self.balances.get(liquidityToekn_address)!!;
         balance -= msg.amount;
         self.balances.set(liquidityToekn_address, balance);
         //扣除池子中lptoken总量
         // self.totalSupply -= msg.amount;
         //发送TokenBurnNotification消息
-        send(SendParamters{
+        send(SendParameters{
                 to: myAddress(),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -199,7 +200,7 @@ contract Exchange with Deployable, Jetton {
             }
         );
         //发送ton_amount给消息发送者的钱包
-        send(SendParamters{
+        send(SendParameters{
                 to: ctx.sender,
                 value: ton_amount,
                 mode: SendIgnoreErrors,
@@ -208,7 +209,7 @@ contract Exchange with Deployable, Jetton {
         );
         //发送token给消息发送者的jetton钱包
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -218,7 +219,10 @@ contract Exchange with Deployable, Jetton {
                     from: myAddress(),
                     response_destination: myAddress(),
                     forward_ton_amount: 0,
-                    forward_payload: emptySlice()
+                    forward_payload: emptySlice(),
+                    minliquidity_tokenssold: 0,
+                    maxtokens_minton: 0,
+                    recipient: newAddress(0, 0)
                 }.toCell(),
                 code: init.code,
                 data: init.data
@@ -262,7 +266,7 @@ contract Exchange with Deployable, Jetton {
         require(tokens_bought >= min_tokens, "invalid tokens_bought amount");
         //发送tokens_bought给消息发送者recipient的jetton钱包
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), recipient);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -325,11 +329,11 @@ contract Exchange with Deployable, Jetton {
         let ton_refund: Int = (max_ton - ton_sold);
         if (ton_refund > 0) {
             //向buyer发送剩余的ton
-            send(SendParamters{to: buyer, value: ton_refund, mode: SendIgnoreErrors, body: "refund ton ".asComment()});
+            send(SendParameters{to: buyer, value: ton_refund, mode: SendIgnoreErrors, body: "refund ton ".asComment()});
         }
         //向recipient发送tokens_bought的代币
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), recipient);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -368,10 +372,10 @@ contract Exchange with Deployable, Jetton {
         let ton_bought: Int = self.getInputPrice(tokens_sold, token_reserve, myBalance());
         require(ton_bought > min_ton, "invalid ton_bought");
         //向recipient发送ton_bought数量的ton
-        send(SendParamters{to: recipient, value: ton_bought, mode: SendIgnoreErrors, body: "ton bought ".asComment()});
+        send(SendParameters{to: recipient, value: ton_bought, mode: SendIgnoreErrors, body: "ton bought ".asComment()});
         //从buyer向合约本身转入token_sold的代币
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), buyer);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -420,10 +424,10 @@ contract Exchange with Deployable, Jetton {
         let tokens_sold: Int = self.getOutputPrice(ton_bought, token_reserve, myBalance());
         require(max_tokens >= tokens_sold);
         //向recipient发送ton_bought的ton
-        send(SendParamters{to: recipient, value: ton_bought, mode: SendIgnoreErrors, body: "ton bought ".asComment()});
+        send(SendParameters{to: recipient, value: ton_bought, mode: SendIgnoreErrors, body: "ton bought ".asComment()});
         //从buyer向合约本身发送tokens_sold的代币
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), buyer);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -472,7 +476,7 @@ contract Exchange with Deployable, Jetton {
         require(ton_bought >= min_ton_bought);
         //从buyer向合约本身转移tokens_sold数量的代币
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), buyer);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
@@ -493,7 +497,7 @@ contract Exchange with Deployable, Jetton {
         self.tokenReserve += tokens_sold;
         //向exchange_addr发送TonToTokenTransferInput消息调用_tonToTokenTransferInput方法
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), exchange_addr);
-        send(SendParamters{
+        send(SendParameters{
                 to: contractAddress(init),
                 value: ton_bought,
                 mode: SendIgnoreErrors,
@@ -524,7 +528,7 @@ contract Exchange with Deployable, Jetton {
         if (self.tokenToExchange.get(token_addr) != null) {
             let exchange_addr: Address = self.tokenToExchange.get(token_addr);
         } else {
-            send(SendParamters{
+            send(SendParameters{
                     to: self.factoryAddress,
                     value: 0,
                     mode: SendIgnoreErrors,

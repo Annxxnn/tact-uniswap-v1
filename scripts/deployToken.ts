@@ -1,9 +1,20 @@
-import { toNano } from '@ton/core';
+import { Address, toNano } from '@ton/core';
 import { Token } from '../wrappers/Token';
 import { NetworkProvider } from '@ton/blueprint';
+import { buildOnchainMetadata } from "../utils/jetton-helpers";
 
 export async function run(provider: NetworkProvider) {
-    const token = provider.open(await Token.fromInit());
+    //owner: Address, content: Cell, initialSupply: Int
+    const owner = Address.parse("0QADO0v9Mcv_BiDizIk_hpXhZOU5zrc95neaLyFXnN5UYiQF");
+    const jettonParams = {
+        name: "tokenA",
+        description: "This is description of Test Jetton Token in Tact-lang of uniswap",
+        symbol: "A",
+        image: "https://avatars.githubusercontent.com/u/104382459?s=200&v=4",
+    };
+    let content = buildOnchainMetadata(jettonParams);
+    const initialSupply = toNano('1000000000');
+    const token = provider.open(await Token.fromInit(owner, content, initialSupply));
 
     await token.send(
         provider.sender(),
