@@ -306,11 +306,11 @@ contract CoreExchange with Deployable, Jetton {
         return self.tokenToTonInput(tokens_sold, min_ton, ctx.sender, recipient);
     }
 
-    receive(msg: TokenToTonTransferInput){
-        let tokens_bought: Int = self._tokenToTonTransferInput(msg.tokens_sold, msg.min_ton, msg.recipient);
-    }
+    // receive(msg: TokenToTonTransferInput){
+    //     let tokens_bought: Int = self._tokenToTonTransferInput(msg.tokens_sold, msg.min_ton, msg.recipient);
+    // }
 
-    receive(msg: TokenToTonSwapInput){
-        let tokens_bought: Int = self._tokenToTonSwapInput(msg.tokens_sold, msg.min_ton);
-    }
+    // receive(msg: TokenToTonSwapInput){
+    //     let tokens_bought: Int = self._tokenToTonSwapInput(msg.tokens_sold, msg.min_ton);
+    // }
 }

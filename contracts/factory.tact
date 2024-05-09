@@ -1,5 +1,6 @@
 import "@stdlib/deploy";
-import "./exchange.tact";
+// import "./exchange.tact";
+import "./core_exchange.tact";
 message CreateExchange {
     tokenAddress: Address;
     response_address: Address?;
@@ -19,9 +20,11 @@ contract Factory with Deployable {
     tokenToExchange: map<Address, Address>;
     exchangeToToken: map<Address, Address>;
     idToToken: map<Int, Address>;
-    init(){
+    content: Cell;
+    init(content: Cell){
         self.exchangeTemplate = newAddress(0, 0);
         self.tokenCount = 0;
+        self.content = content;
     }
 
     receive(msg: InitializeFactory){
@@ -33,7 +36,7 @@ contract Factory with Deployable {
     receive(msg: CreateExchange){
         require(msg.tokenAddress != newAddress(0, 0), "invalid token address");
         require(self.tokenToExchange.get(msg.tokenAddress) == newAddress(0, 0), "exchange already exists");
-        let einit: StateInit = initOf Exchange(msg.tokenAddress, myAddress(), self.content);
+        let einit: StateInit = initOf CoreExchange(msg.tokenAddress, myAddress(), self.content);
         let exchangeAddress: Address = contractAddress(einit);
         send(SendParameters{
                 to: exchangeAddress,
@@ -62,26 +65,26 @@ contract Factory with Deployable {
 
     receive(msg: GetExchangeAddress){
         let ctx: Context = context();
-        let exchange_addr: Address = tokenToExchange.get(msg.token_addr);
+        let exchange_addr: Address = self.tokenToExchange.get(msg.tokenAddr)!!;
         send(SendParameters{
                 to: ctx.sender,
                 value: 0,
                 mode: SendIgnoreErrors,
-                body: TokenToExchangeAddress{tokenAddr: msg.tokenAddr, exchangeAddr: exchange_addr}
+                body: TokenToExchangeAddress{tokenAddr: msg.tokenAddr, exchangeAddr: exchange_addr}.toCell()
             }
         );
     }
 
     get fun getExchange(tokenAddress: Address): Address {
-        return self.tokenToExchange.get(tokenAddress);
+        return self.tokenToExchange.get(tokenAddress)!!;
     }
 
     get fun getToken(exchangeAddress: Address): Address {
-        return self.exchangeToToken.get(exchangeAddress);
+        return self.exchangeToToken.get(exchangeAddress)!!;
     }
 
     get fun getTokenWithId(token_id: Int): Address {
-        return self.idToToken.get(token_id);
+        return self.idToToken.get(token_id)!!;
     }
 
     //  fun getContent(name: String, simple: String): Cell {

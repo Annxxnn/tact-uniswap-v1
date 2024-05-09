@@ -1,9 +1,16 @@
 import { toNano } from '@ton/core';
 import { Factory } from '../wrappers/Factory';
 import { NetworkProvider } from '@ton/blueprint';
-
+import { buildOnchainMetadata } from "../utils/jetton-helpers";
 export async function run(provider: NetworkProvider) {
-    const factory = provider.open(await Factory.fromInit());
+    const LPParams = {
+        name: "LP token",
+        description: "This is description of Test LP Token in Tact-lang of uniswap",
+        symbol: "LP",
+        image: "https://avatars.githubusercontent.com/u/104382459?s=200&v=4",
+    };
+    let content = buildOnchainMetadata(LPParams);
+    const factory = provider.open(await Factory.fromInit(content));
 
     await factory.send(
         provider.sender(),
