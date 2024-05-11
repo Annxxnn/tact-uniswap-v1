@@ -27,6 +27,7 @@ describe('CoreExchange', () => {
             deployer.getSender(),
             {
                 value: toNano('0.5'),
+                bounce: false,
             },
             {
                 $$type: 'Deploy',
