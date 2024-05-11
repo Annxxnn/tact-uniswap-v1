@@ -302,7 +302,7 @@ contract CoreExchange with Deployable, Jetton {
     }
 
     get fun getTonReserve(): Int{
-        return myBalance();
+        return myBalance()+1;
     }
     ////////////////////////////
     get fun getTotalSupply(): Int{
