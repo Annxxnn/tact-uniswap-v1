@@ -4,6 +4,12 @@ import "./jetton.tact";
 struct Allowances {
     allowance: map<Address, Int>;
 }
+struct TokenTOTonInput {
+    tokens_sold: Int;
+    min_ton: Int;
+    recipient: Address;
+    is_token_transfer: Bool;
+}
 /////////////liquidity message///////////////////
 message RemoveLiquidity {
     queryId: Int;
@@ -13,10 +19,6 @@ message RemoveLiquidity {
 }
 message GetExchangeAddress {
     tokenAddr: Address;
-}
-message TokenToExchangeAddress {
-    tokenAddr: Address;
-    exchangeAddr: Address;
 }
 /////////////swap message/////////////////
 message TonToTokenTransferInput {
@@ -44,8 +46,7 @@ contract CoreExchange with Deployable, Jetton {
     factoryAddress: Address;
     tokenReserve: Int = 0;
     balances: map<Address, Int>; //uni token (user)
-    //allowances: map<Address, Allowances>; //uni token
-    tokenToExchange: map<Address, Address>;
+    tokenToTonInput: map<Address, TokenTOTonInput>;
     //jetton standerd
     totalSupply: Int = 0; //uni token
     mintable: Bool = true;
@@ -62,32 +63,67 @@ contract CoreExchange with Deployable, Jetton {
         let ctx: Context = context();
         let tokenamount: Int = msg.amount;
         if (msg.forward_payload == createOffchainContent("add Liqudity").asSlice()) {
-            self.addLiqudity(msg.minliquidity_tokenssold, msg.maxtokens_minton);
+            self.addLiqudity(tokenamount);
         }
-        if (msg.forward_payload == createOffchainContent("token swap ton to myself").asSlice()) {
-            self._tokenToTonSwapInput(msg.minliquidity_tokenssold, msg.maxtokens_minton);
+        if (
+            msg.forward_payload == createOffchainContent("token swap ton to myself").asSlice() &&
+            self.tokenToTonInput.get(ctx.sender) != null
+        ) {
+            let input: TokenTOTonInput = self.tokenToTonInput.get(ctx.sender)!!;
+            input.is_token_transfer = true;
+            require(input.tokens_sold > 0 && input.min_ton > 0, "invalid amount");
+            require(input.is_token_transfer == true, "should be token transfer");
+            self._tokenToTonSwapInput(input.tokens_sold, input.min_ton);
         }
-        if (msg.forward_payload == createOffchainContent("token swap ton to recipent").asSlice()) {
-            self._tokenToTonTransferInput(msg.minliquidity_tokenssold, msg.maxtokens_minton, msg.recipient);
+        if (
+            msg.forward_payload == createOffchainContent("token swap ton to recipent").asSlice() &&
+            self.tokenToTonInput.get(ctx.sender) != null
+        ) {
+            let input: TokenTOTonInput = self.tokenToTonInput.get(ctx.sender)!!;
+            input.is_token_transfer = true;
+            require(input.tokens_sold > 0 && input.min_ton > 0, "invalid amount");
+            require(input.is_token_transfer == true, "should be token transfer");
+            require(input.recipient != myAddress() && input.recipient != newAddress(0, 0), "invalid recipient address");
+            self._tokenToTonTransferInput(input.tokens_sold, input.min_ton, input.recipient);
         }
     }
 
-    // @param min_liquidity Minimum number of UNI sender will mint if total UNI supply is greater than 0.
-    // @param max_tokens Maximum number of tokens deposited. Deposits max amount if total UNI supply is 0.
-     fun addLiqudity(min_liquidity: Int, max_tokens: Int): Int {
+    receive(msg: TokenToTonTransferInput){
         let ctx: Context = context();
-        require(max_tokens > 0 && ctx.value > 0, "invalid token amount and tonvalue");
+        self.tokenToTonInput.set(ctx.sender,
+            TokenTOTonInput{
+                tokens_sold: msg.tokens_sold,
+                min_ton: msg.min_ton,
+                recipient: msg.recipient,
+                is_token_transfer: false
+            }
+        );
+    }
+
+    receive(msg: TokenToTonSwapInput){
+        let ctx: Context = context();
+        self.tokenToTonInput.set(ctx.sender,
+            TokenTOTonInput{
+                tokens_sold: msg.tokens_sold,
+                min_ton: msg.min_ton,
+                recipient: ctx.sender,
+                is_token_transfer: false
+            }
+        );
+    }
+
+     fun addLiqudity(tokenAmount: Int): Int {
+        let ctx: Context = context();
+        require(ctx.value > 0 && myBalance()>ctx.value, "invalid tonvalue");
         let total_liquidity: Int = self.totalSupply;
         if (total_liquidity > 0) {
-            require(min_liquidity > 0, "invalid liquidity");
             let ton_reserve: Int = (myBalance() - ctx.value);
-            let token_amount: Int = (ctx.value * self.tokenReserve / ton_reserve + 1);
-            let liquidity_minted: Int = ctx.value * total_liquidity / ton_reserve;
-            require(max_tokens >= token_amount && liquidity_minted >= min_liquidity, "Does not meet the requirements");
-            // Add Liquidity(mint LP token to the address that the owner is the message sender)
-            // send(SendParameters{});
-            let liquidityToekn_address: Address = self.getwalletaddress(ctx.sender);
-            //to: Address, amount: Int, response_destination: Address
+            //计算lptoken的数量
+            let liquidity_minted0: Int = ctx.value * total_liquidity / ton_reserve;
+            let liquidity_minted1: Int = tokenAmount * total_liquidity / self.tokenReserve;
+            let liquidity_minted: Int = liquidity_minted0 < liquidity_minted1 ? liquidity_minted0 : liquidity_minted1;
+            //计算添加流动性用户的地址
+            let liquidityToekn_address: Address = contractAddress(self.getJettonWalletInit(ctx.sender));
             self.mint(ctx.sender, liquidity_minted, myAddress());
             //balancen不为零时
             if (self.balances.get(liquidityToekn_address) != null) {
@@ -97,10 +133,7 @@ contract CoreExchange with Deployable, Jetton {
             } else {
                 self.balances.set(liquidityToekn_address, liquidity_minted);
             }
-            //trait jetton 已经更新过了
-            // self.totalSupply = (total_liquidity + liquidity_minted);
-            // send token to the contract from the message sender?????
-            self.tokenReserve += token_amount;
+            self.tokenReserve += tokenAmount;
             return liquidity_minted;
         } else {
             require(self.factoryAddress != newAddress(0, 0) &&
@@ -108,23 +141,14 @@ contract CoreExchange with Deployable, Jetton {
                     ctx.value >= 1000000000,
                 "invalid address and value"
             );
-            //得到factory合约中token对应的exchange地址,确保获取到的交易所地址等于当前合约地址。
-            //self.factory.getExchange(token_addr)
-            require(self.getTokenToExchangeAddress(self.tokenAddress) == myAddress(), "invalid exchange address");
-            let token_amount: Int = max_tokens;
             let initial_liquidity: Int = myBalance();
-            //trait jetton 已经更新过了
-            // self.totalSupply = initial_liquidity;
             self.mint(ctx.sender, initial_liquidity, myAddress());
             self.balances.set(ctx.sender, initial_liquidity);
-            self.tokenReserve += token_amount;
+            self.tokenReserve += tokenAmount;
             return initial_liquidity;
         }
     }
 
-    //# @param amount Amount of UNI burned.
-    //# @param min_eth Minimum ETH withdrawn.
-    //# @param min_tokens Minimum Tokens withdrawn.
 
     receive(msg: RemoveLiquidity){
         let ctx: Context = context();
@@ -136,19 +160,18 @@ contract CoreExchange with Deployable, Jetton {
         let token_amount: Int = msg.amount * token_reserve / total_liquidity;
         require(ton_amount >= msg.min_ton && token_amount >= msg.min_tokens, "Does not meet the requirements");
         //扣除balances结构中对应地址的lptoken
-        let liquidityToekn_address: Address = self.getwalletaddress(ctx.sender);
+        let liquidityToekn_address: Address = contractAddress(self.getJettonWalletInit(ctx.sender));
         let balance: Int = self.balances.get(liquidityToekn_address)!!;
         balance -= msg.amount;
         self.balances.set(liquidityToekn_address, balance);
         //扣除池子中lptoken总量
-        // self.totalSupply -= msg.amount;
         //发送TokenBurnNotification消息
         send(SendParameters{
                 to: myAddress(),
                 value: 0,
                 mode: SendIgnoreErrors,
                 body: TokenBurnNotification{
-                    queryId: msg.queryId,
+                    query_id: msg.queryId,
                     amount: msg.amount,
                     sender: myAddress(),
                     response_destination: myAddress()
@@ -156,13 +179,6 @@ contract CoreExchange with Deployable, Jetton {
             }
         );
         //发送ton_amount给消息发送者的钱包
-        send(SendParameters{
-                to: ctx.sender,
-                value: ton_amount,
-                mode: SendIgnoreErrors,
-                body: "remove liquidity ".asComment()
-            }
-        );
         //发送token给消息发送者的jetton钱包
         let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
         send(SendParameters{
@@ -170,15 +186,12 @@ contract CoreExchange with Deployable, Jetton {
                 value: 0,
                 mode: SendIgnoreErrors,
                 body: TokenTransferInternal{
-                    queryId: msg.queryId,
+                    query_id: msg.queryId,
                     amount: token_amount,
                     from: myAddress(),
                     response_destination: myAddress(),
-                    forward_ton_amount: 0,
-                    forward_payload: emptySlice(),
-                    minliquidity_tokenssold: 0,
-                    maxtokens_minton: 0,
-                    recipient: newAddress(0, 0)
+                    forward_ton_amount: ton_amount,
+                    forward_payload: emptySlice()
                 }.toCell(),
                 code: init.code,
                 data: init.data
@@ -213,25 +226,6 @@ contract CoreExchange with Deployable, Jetton {
         let denominator: Int = (output_reserve - output_amount) * 997;
         return (numerator / denominator + 1);
     }
-
-     fun getTokenToExchangeAddress(token_addr: Address): Address {
-        //得到指定token的对应的exchange的合约地址
-        let exchange_addr: Address = newAddress(0, 0); // Declare and initialize exchange_addr with a default value
-        if (self.tokenToExchange.get(token_addr) != null) {
-            exchange_addr = self.tokenToExchange.get(token_addr)!!; // Assign the value inside the if statement
-        } else {
-            send(SendParameters{
-                    to: self.factoryAddress,
-                    value: 0,
-                    mode: SendIgnoreErrors,
-                    body: GetExchangeAddress{tokenAddr: token_addr}.toCell()
-                }
-            );
-            exchange_addr = self.tokenToExchange.get(token_addr)!!; // Assign the value inside the else statement
-        }
-        return exchange_addr; // Return exchange_addr at the end of the function
-    }
-
     /////////////////ton  swap  token///////////////////////////////////
 
      fun tonToTokenInput(ton_sold: Int, min_tokens: Int, buyer: Address, recipient: Address, queryId: Int): Int {
@@ -246,15 +240,12 @@ contract CoreExchange with Deployable, Jetton {
                 value: 0,
                 mode: SendIgnoreErrors,
                 body: TokenTransferInternal{
-                    queryId: queryId,
+                    query_id: queryId,
                     amount: tokens_bought,
                     from: myAddress(),
-                    response_destination: myAddress(),
+                    response_destination: recipient,
                     forward_ton_amount: 0,
-                    forward_payload: emptySlice(),
-                    minliquidity_tokenssold: 0,
-                    maxtokens_minton: 0,
-                    recipient: newAddress(0, 0)
+                    forward_payload: emptySlice()
                 }.toCell(),
                 code: init.code,
                 data: init.data
@@ -306,11 +297,22 @@ contract CoreExchange with Deployable, Jetton {
         return self.tokenToTonInput(tokens_sold, min_ton, ctx.sender, recipient);
     }
 
-    // receive(msg: TokenToTonTransferInput){
-    //     let tokens_bought: Int = self._tokenToTonTransferInput(msg.tokens_sold, msg.min_ton, msg.recipient);
-    // }
+    get fun getTokenReserve(): Int{
+        return self.tokenReserve;
+    }
 
-    // receive(msg: TokenToTonSwapInput){
-    //     let tokens_bought: Int = self._tokenToTonSwapInput(msg.tokens_sold, msg.min_ton);
-    // }
+    get fun getTonReserve(): Int{
+        return myBalance();
+    }
+    ////////////////////////////
+    get fun getTotalSupply(): Int{
+        return self.totalSupply;
+    }
+
+    get fun getAddress(): Address{
+        return myAddress();
+    }
+    get fun getBalances(address: Address): Int{
+        return self.balances.get(address)!!;
+    }
 }

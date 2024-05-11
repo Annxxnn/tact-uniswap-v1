@@ -2,6 +2,7 @@ import { toNano } from '@ton/core';
 import { Factory } from '../wrappers/Factory';
 import { NetworkProvider } from '@ton/blueprint';
 import { buildOnchainMetadata } from "../utils/jetton-helpers";
+//EQABxHhflaZLnBwpF0Dl1RJnZly8gMbhIY15oIcKDwULeIk9
 export async function run(provider: NetworkProvider) {
     const LPParams = {
         name: "LP token",

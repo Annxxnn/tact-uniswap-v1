@@ -63,17 +63,17 @@ contract Factory with Deployable {
         self.idToToken.set(self.tokenCount, msg.tokenAddress);
     }
 
-    receive(msg: GetExchangeAddress){
-        let ctx: Context = context();
-        let exchange_addr: Address = self.tokenToExchange.get(msg.tokenAddr)!!;
-        send(SendParameters{
-                to: ctx.sender,
-                value: 0,
-                mode: SendIgnoreErrors,
-                body: TokenToExchangeAddress{tokenAddr: msg.tokenAddr, exchangeAddr: exchange_addr}.toCell()
-            }
-        );
-    }
+    // receive(msg: GetExchangeAddress){
+    //     let ctx: Context = context();
+    //     let exchange_addr: Address = self.tokenToExchange.get(msg.tokenAddr)!!;
+    //     send(SendParameters{
+    //             to: ctx.sender,
+    //             value: 0,
+    //             mode: SendIgnoreErrors,
+    //             body: TokenToExchangeAddress{tokenAddr: msg.tokenAddr, exchangeAddr: exchange_addr}.toCell()
+    //         }
+    //     );
+    // }
 
     get fun getExchange(tokenAddress: Address): Address {
         return self.tokenToExchange.get(tokenAddress)!!;
