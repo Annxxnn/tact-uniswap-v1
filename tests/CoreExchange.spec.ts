@@ -50,33 +50,41 @@ describe('CoreExchange', () => {
         // blockchain and coreExchange are ready to use
     });
     it('should get ton reserve', async () => {
+        // await coreExchange.send(
+        //     deployer.getSender(),
+        //     {
+        //         value: toNano('5'),
+        //     },
+
+        // );
         const tonReserve = await coreExchange.getGetTonReserve();
         console.log('tonReserve', tonReserve);
         expect(tonReserve).toBe(0n);
     });
     it('should add liquidity', async () => {
-        const addLiquidity = 1;
-        for (let i = 0; i < addLiquidity; i++) {
-            console.log(`add liquidity ${i + 1}/${addLiquidity}`);
 
-            const adder = await blockchain.treasury('adder' + i);
+        const adder = await blockchain.treasury('adder');
+        const liquidityBefore = await coreExchange.getGetTotalSupply();
+        if (liquidityBefore == 0n) {
+            const adder = await blockchain.treasury('adder');
 
             const liquidityBefore = await coreExchange.getGetTotalSupply();
 
             console.log('liquidity before adding', liquidityBefore);
             //转入的ton数量
-            const tonAmount = BigInt(Math.floor(Math.random() * 100));
+            const tonAmount = 2n;
             const tokenReserveBefore = await coreExchange.getGetTokenReserve();
             const tonReserveBefore = await coreExchange.getGetTonReserve();
             //转入的token数量
-            const tokenAmount = (tonAmount * tokenReserveBefore) / (tonReserveBefore + tonAmount);
+            const tokenAmount = 1n;
             //将"add Liqudity"转换成Slice格式
             const addString = "add Liquidity";
             const addLiquiditySlice = beginCell()
                 .storeStringTail(addString)
                 .endCell().asSlice();
-
+            console.log("---------------------------");
             const balancesBefore = await coreExchange.getGetBalances(adder.address);
+            console.log('balances before adding', balancesBefore);
             const addLiquidityResult = await coreExchange.send(
                 adder.getSender(),
                 {
@@ -85,37 +93,169 @@ describe('CoreExchange', () => {
                 {
                     $$type: 'TokenNotification',
                     query_id: 0n,
-                    amount: tokenAmount,
+                    amount: toNano(tokenAmount),
                     from: adder.address,
                     forward_payload: addLiquiditySlice.asCell()// Add a comma here
                 }
             );
             //const owner = Address.parse("0QADO0v9Mcv_BiDizIk_hpXhZOU5zrc95neaLyFXnN5UYiQF");
             //计算添加的流动性
-            const liquidity_minted0 = tonAmount * liquidityBefore / tonReserveBefore;
-            const liquidity_minted1 = tokenAmount * liquidityBefore / tokenReserveBefore;
-            const liquidity_minted = liquidity_minted0 < liquidity_minted1 ? liquidity_minted0 : liquidity_minted1;
+            console.log("---------------------------")
+            const tonReserveAfter = await coreExchange.getGetTonReserve();
+            console.log('tonReserveAfter', tonReserveAfter);
+            const liquidity_minted = toNano(tonAmount);
             expect(addLiquidityResult.transactions).toHaveTransaction({
                 from: adder.address,
                 to: coreExchange.address,
                 success: true,
             });
-
+            ///////////////////////////////
             const liquidityAfter = await coreExchange.getGetTotalSupply();
-
             console.log('liquidity after adding', liquidityAfter);
-
-            expect(liquidityAfter).toBe(liquidityBefore + liquidity_minted);
-
             const balancesAfter = await coreExchange.getGetBalances(adder.address);
-            expect(balancesAfter == balancesBefore + liquidity_minted);
-
+            console.log('balances after adding', balancesAfter);
             const tokenReserveAfter = await coreExchange.getGetTokenReserve();
-            expect(tokenReserveAfter).toBe(tokenReserveBefore + tokenAmount);
+            console.log('tokenReserveAfter', tokenReserveAfter);
 
-            const tonReserveAfter = await coreExchange.getGetTonReserve();
-            expect(tonReserveAfter).toBe(tonReserveBefore + tonAmount);
+            expect(liquidityAfter).toEqual(liquidityBefore + liquidity_minted);
+
+            expect(balancesAfter).toEqual(balancesBefore + liquidity_minted);
+
+            expect(tokenReserveAfter).toEqual(tokenReserveBefore + toNano(tokenAmount));
+
+            expect(tonReserveAfter).toBeLessThan(tonReserveBefore + toNano(tonAmount));
 
         }
+        const liquidityAftertheFirst = await coreExchange.getGetTotalSupply();
+        console.log('liquidity after adding first', liquidityAftertheFirst);
+        //转入的ton数量
+        const tonAmount = 2n;
+        const tokenReserveBeforethefirst = await coreExchange.getGetTokenReserve();
+        console.log('tokenReserveBeforethefirst', tokenReserveBeforethefirst);
+        const tonReserveBeforethefirst = await coreExchange.getGetTonReserve();
+        console.log('tonReserveBeforethefirst', tonReserveBeforethefirst);
+        //转入的token数量
+        const tokenAmount = toNano(toNano(tonAmount) * tokenReserveBeforethefirst) / toNano(tonReserveBeforethefirst + toNano(tonAmount));
+        console.log('tokenAmount', tokenAmount);
+        //将"add Liqudity"转换成Slice格式
+        const addString = "add Liquidity";
+        const addLiquiditySlice = beginCell()
+            .storeStringTail(addString)
+            .endCell().asSlice();
+
+        const balancesBeforethefirst = await coreExchange.getGetBalances(adder.address);
+        console.log('balances after adding first', balancesBeforethefirst);
+        const addLiquidityResult = await coreExchange.send(
+            adder.getSender(),
+            {
+                value: toNano(tonAmount),
+            },
+            {
+                $$type: 'TokenNotification',
+                query_id: 0n,
+                amount: tokenAmount,
+                from: adder.address,
+                forward_payload: addLiquiditySlice.asCell()// Add a comma here
+            }
+        );
+        //const owner = Address.parse("0QADO0v9Mcv_BiDizIk_hpXhZOU5zrc95neaLyFXnN5UYiQF");
+        //计算添加的流动性
+        const liquidity_minted0 = toNano(tonAmount) * liquidityAftertheFirst / tonReserveBeforethefirst;
+        const liquidity_minted1 = tokenAmount * liquidityAftertheFirst / tokenReserveBeforethefirst;
+        const liquidity_minted = liquidity_minted0 < liquidity_minted1 ? liquidity_minted0 : liquidity_minted1;
+        console.log("liquidity_minted0", liquidity_minted0);
+        console.log("liquidity_minted1", liquidity_minted1);
+        console.log("liquidity_minted", liquidity_minted);
+        expect(addLiquidityResult.transactions).toHaveTransaction({
+            from: adder.address,
+            to: coreExchange.address,
+            success: true,
+        });
+
+        const liquidityAftertwice = await coreExchange.getGetTotalSupply();
+
+        console.log('liquidity after adding twice', liquidityAftertwice);
+
+        expect(liquidityAftertwice).toEqual(liquidityAftertheFirst + liquidity_minted);
+
+        const balancesAfter = await coreExchange.getGetBalances(adder.address);
+        console.log('balances after adding twice', balancesAfter);
+        expect(balancesAfter).toEqual(balancesBeforethefirst + liquidity_minted);
+
+        const tokenReserveAfter = await coreExchange.getGetTokenReserve();
+        console.log('tokenReserveAfter', tokenReserveAfter);
+        expect(tokenReserveAfter).toEqual(tokenReserveBeforethefirst + tokenAmount);
+
+        const tonReserveAfter = await coreExchange.getGetTonReserve();
+        console.log('tonReserveAfter', tonReserveAfter);
+        expect(tonReserveAfter).toBeLessThan(tonReserveBeforethefirst + toNano(tonAmount));
     });
+
+    // it('should add liquidity first', async () => {
+    //     const addLiquidity = 1;
+    //     for (let i = 0; i < addLiquidity; i++) {
+    //         console.log(`add liquidity ${i + 1}/${addLiquidity}`);
+
+    //         const adder = await blockchain.treasury('adder' + i);
+
+    //         const liquidityBefore = await coreExchange.getGetTotalSupply();
+
+    //         console.log('liquidity before adding', liquidityBefore);
+    //         //转入的ton数量
+    //         const tonAmount = 2n;
+    //         const tokenReserveBefore = await coreExchange.getGetTokenReserve();
+    //         const tonReserveBefore = await coreExchange.getGetTonReserve();
+    //         //转入的token数量
+    //         const tokenAmount = 1n;
+    //         //将"add Liqudity"转换成Slice格式
+    //         const addString = "add Liquidity";
+    //         const addLiquiditySlice = beginCell()
+    //             .storeStringTail(addString)
+    //             .endCell().asSlice();
+    //         console.log("---------------------------");
+    //         const balancesBefore = await coreExchange.getGetBalances(adder.address);
+    //         console.log('balances before adding', balancesBefore);
+    //         const addLiquidityResult = await coreExchange.send(
+    //             adder.getSender(),
+    //             {
+    //                 value: toNano(tonAmount),
+    //             },
+    //             {
+    //                 $$type: 'TokenNotification',
+    //                 query_id: 0n,
+    //                 amount: tokenAmount,
+    //                 from: adder.address,
+    //                 forward_payload: addLiquiditySlice.asCell()// Add a comma here
+    //             }
+    //         );
+    //         //const owner = Address.parse("0QADO0v9Mcv_BiDizIk_hpXhZOU5zrc95neaLyFXnN5UYiQF");
+    //         //计算添加的流动性
+    //         console.log("---------------------------")
+    //         const tonReserveAfter = await coreExchange.getGetTonReserve();
+    //         console.log('tonReserveAfter', tonReserveAfter);
+    //         const liquidity_minted = toNano(tonAmount);
+    //         expect(addLiquidityResult.transactions).toHaveTransaction({
+    //             from: adder.address,
+    //             to: coreExchange.address,
+    //             success: true,
+    //         });
+    //         ///////////////////////////////
+    //         const liquidityAfter = await coreExchange.getGetTotalSupply();
+    //         console.log('liquidity after adding', liquidityAfter);
+    //         const balancesAfter = await coreExchange.getGetBalances(adder.address);
+    //         console.log('balances after adding', balancesAfter);
+    //         const tokenReserveAfter = await coreExchange.getGetTokenReserve();
+    //         console.log('tokenReserveAfter', tokenReserveAfter);
+
+    //         expect(liquidityAfter).toEqual(liquidityBefore + liquidity_minted);
+
+    //         expect(balancesAfter).toEqual(balancesBefore + liquidity_minted);
+
+    //         expect(tokenReserveAfter).toEqual(tokenReserveBefore + tokenAmount);
+
+    //         expect(tonReserveAfter).toBeLessThan(tonReserveBefore + toNano(tonAmount));
+
+    //     }
+    // });
+
 });

@@ -62,7 +62,8 @@ contract CoreExchange with Deployable, Jetton {
     receive(msg: TokenNotification){
         let ctx: Context = context();
         let tokenamount: Int = msg.amount;
-        if (msg.forward_payload == createOffchainContent("add Liqudity").asSlice()) {
+        if (msg.forward_payload ==  "add Liquidity".asSlice()){
+
             self.addLiqudity(tokenamount);
         }
         if (
@@ -114,7 +115,7 @@ contract CoreExchange with Deployable, Jetton {
 
      fun addLiqudity(tokenAmount: Int): Int {
         let ctx: Context = context();
-        require(ctx.value > 0 && myBalance()>ctx.value, "invalid tonvalue");
+        require(ctx.value > 0, "invalid tonvalue");
         let total_liquidity: Int = self.totalSupply;
         if (total_liquidity > 0) {
             let ton_reserve: Int = (myBalance() - ctx.value);
@@ -126,21 +127,21 @@ contract CoreExchange with Deployable, Jetton {
             let liquidityToekn_address: Address = contractAddress(self.getJettonWalletInit(ctx.sender));
             self.mint(ctx.sender, liquidity_minted, myAddress());
             //balancen不为零时
-            if (self.balances.get(liquidityToekn_address) != null) {
-                let balance: Int = self.balances.get(liquidityToekn_address)!!;
+            if (self.balances.get(ctx.sender) != null) {
+                let balance: Int = self.balances.get(ctx.sender)!!;
                 balance += liquidity_minted;
-                self.balances.set(liquidityToekn_address, balance);
+                self.balances.set(ctx.sender, balance);
             } else {
-                self.balances.set(liquidityToekn_address, liquidity_minted);
+                self.balances.set(ctx.sender, liquidity_minted);
             }
             self.tokenReserve += tokenAmount;
             return liquidity_minted;
         } else {
             require(self.factoryAddress != newAddress(0, 0) &&
-                    self.tokenAddress != newAddress(0, 0) &&
-                    ctx.value >= 1000000000,
+                    self.tokenAddress != newAddress(0, 0),
                 "invalid address and value"
             );
+            ///????不扣手续费时的余额
             let initial_liquidity: Int = myBalance();
             self.mint(ctx.sender, initial_liquidity, myAddress());
             self.balances.set(ctx.sender, initial_liquidity);
@@ -302,7 +303,7 @@ contract CoreExchange with Deployable, Jetton {
     }
 
     get fun getTonReserve(): Int{
-        return myBalance()+1;
+        return myBalance();
     }
     ////////////////////////////
     get fun getTotalSupply(): Int{
@@ -313,6 +314,6 @@ contract CoreExchange with Deployable, Jetton {
         return myAddress();
     }
     get fun getBalances(address: Address): Int{
-        return self.balances.get(address)!!;
+        return self.balances.get(address) == null ? 0 : self.balances.get(address)!!;
     }
 }
