@@ -150,44 +150,44 @@ contract CoreExchange with Deployable, Jetton {
         }
     }
 
+    receive(msg: TokenBurnNotification){
 
-    receive(msg: RemoveLiquidity){
+    }
+    fun removeLiquidity(queryId: Int, amount: Int){
         let ctx: Context = context();
-        require(msg.amount > 0 && msg.min_ton > 0 && msg.min_tokens > 0, "invalid remove input");
         let total_liquidity: Int = self.totalSupply;
         require(total_liquidity > 0, "the pool have not enough lptoken");
         let token_reserve: Int = self.tokenReserve;
-        let ton_amount: Int = msg.amount * myBalance() / total_liquidity;
-        let token_amount: Int = msg.amount * token_reserve / total_liquidity;
-        require(ton_amount >= msg.min_ton && token_amount >= msg.min_tokens, "Does not meet the requirements");
+        let ton_amount: Int = amount * myBalance() / total_liquidity;
+        let token_amount: Int = amount * token_reserve / total_liquidity;
         //扣除balances结构中对应地址的lptoken
-        let liquidityToekn_address: Address = contractAddress(self.getJettonWalletInit(ctx.sender));
-        let balance: Int = self.balances.get(liquidityToekn_address)!!;
+        let balance: Int = self.balances.get(ctx.sender)!!;
         balance -= msg.amount;
-        self.balances.set(liquidityToekn_address, balance);
+        self.balances.set(ctx.sender, balance);
         //扣除池子中lptoken总量
-        //发送TokenBurnNotification消息
+        //向用户的lp jetton钱包发送TokenBurn消息
+        let init: StateInit = initOf JettonDefaultWallet(ctx.sender, myAddress());
         send(SendParameters{
-                to: myAddress(),
+                to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
-                body: TokenBurnNotification{
-                    query_id: msg.queryId,
-                    amount: msg.amount,
-                    sender: myAddress(),
-                    response_destination: myAddress()
+                body: TokenBurn{
+                    query_id: queryId,
+                    amount: amount,
+                    response_destination: self.owner,
+                    custom_payload: emptyCell()
                 }.toCell()
             }
         );
         //发送ton_amount给消息发送者的钱包
         //发送token给消息发送者的jetton钱包
-        let init: StateInit = initOf JettonDefaultWallet(myAddress(), ctx.sender);
+        let init: StateInit = initOf JettonDefaultWallet(ctx.sender,myAddress());
         send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
                 body: TokenTransferInternal{
-                    query_id: msg.queryId,
+                    query_id: queryId,
                     amount: token_amount,
                     from: myAddress(),
                     response_destination: myAddress(),

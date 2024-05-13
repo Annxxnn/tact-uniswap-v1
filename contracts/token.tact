@@ -31,17 +31,7 @@ contract Token with Jetton, Deployable {
         require(ctx.sender == self.owner, "Not Owner");
         require(self.mintable, "Can't Mint Anymore");
         self.mint(msg.receiver, msg.amount, self.owner); // (to, amount, response_destination)
-        // let JettonWallet: StateInit = initOf JettonDefaultWallet(myAddress(), msg.receiver);
-        // let JettonWalletAddress: Address = contractAddress(JettonWallet);
-        // self.balance.set(JettonWalletAddress, msg.amount);
     }
-
-    // receive("Mint: 100"){
-    //     // Public Minting
-    //     let ctx: Context = context();
-    //     require(self.mintable, "Can't Mint Anymore");
-    //     self.mint(ctx.sender, 100, self.owner);
-    // }
 
     receive("Owner: MintClose"){
         let ctx: Context = context();
@@ -49,7 +39,7 @@ contract Token with Jetton, Deployable {
         self.mintable = false;
     }
 
-    //  fun getBalanceByAddress(JettonWalletaddress: Address): Int? {
-    //     return self.balance.get(JettonWalletaddress);
-    // }
+    get fun getAddress(): Address {
+        return myAddress();
+    }
 }
