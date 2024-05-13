@@ -67,7 +67,7 @@ contract CoreExchange with Deployable, Jetton {
             self.addLiqudity(tokenamount);
         }
         if (
-            msg.forward_payload == createOffchainContent("token swap ton to myself").asSlice() &&
+            msg.forward_payload == "token swap ton to myself".asSlice() &&
             self.tokenToTonInput.get(ctx.sender) != null
         ) {
             let input: TokenTOTonInput = self.tokenToTonInput.get(ctx.sender)!!;
@@ -77,7 +77,7 @@ contract CoreExchange with Deployable, Jetton {
             self._tokenToTonSwapInput(input.tokens_sold, input.min_ton);
         }
         if (
-            msg.forward_payload == createOffchainContent("token swap ton to recipent").asSlice() &&
+            msg.forward_payload == "token swap ton to recipent".asSlice() &&
             self.tokenToTonInput.get(ctx.sender) != null
         ) {
             let input: TokenTOTonInput = self.tokenToTonInput.get(ctx.sender)!!;
@@ -86,6 +86,9 @@ contract CoreExchange with Deployable, Jetton {
             require(input.is_token_transfer == true, "should be token transfer");
             require(input.recipient != myAddress() && input.recipient != newAddress(0, 0), "invalid recipient address");
             self._tokenToTonTransferInput(input.tokens_sold, input.min_ton, input.recipient);
+        }
+        if(msg.forward_payload == "remove Liquidity".asSlice()){
+            self.removeLiquidity(msg.query_id,msg.amount);
         }
     }
 
@@ -150,10 +153,7 @@ contract CoreExchange with Deployable, Jetton {
         }
     }
 
-    receive(msg: TokenBurnNotification){
-
-    }
-    fun removeLiquidity(queryId: Int, amount: Int){
+    fun removeLiquidity(queryId: Int,amount: Int){
         let ctx: Context = context();
         let total_liquidity: Int = self.totalSupply;
         require(total_liquidity > 0, "the pool have not enough lptoken");
@@ -162,34 +162,23 @@ contract CoreExchange with Deployable, Jetton {
         let token_amount: Int = amount * token_reserve / total_liquidity;
         //扣除balances结构中对应地址的lptoken
         let balance: Int = self.balances.get(ctx.sender)!!;
-        balance -= msg.amount;
+        balance -= amount;
         self.balances.set(ctx.sender, balance);
         //扣除池子中lptoken总量
-        //向用户的lp jetton钱包发送TokenBurn消息
-        let init: StateInit = initOf JettonDefaultWallet(ctx.sender, myAddress());
-        send(SendParameters{
-                to: contractAddress(init),
-                value: 0,
-                mode: SendIgnoreErrors,
-                body: TokenBurn{
-                    query_id: queryId,
-                    amount: amount,
-                    response_destination: self.owner,
-                    custom_payload: emptyCell()
-                }.toCell()
-            }
-        );
+        self.totalSupply -= amount;
         //发送ton_amount给消息发送者的钱包
         //发送token给消息发送者的jetton钱包
-        let init: StateInit = initOf JettonDefaultWallet(ctx.sender,myAddress());
+        //给exchange的token钱包发送tokenTransfer消息
+        let init: StateInit = initOf JettonDefaultWallet(myAddress(),self.tokenAddress);
         send(SendParameters{
                 to: contractAddress(init),
                 value: 0,
                 mode: SendIgnoreErrors,
-                body: TokenTransferInternal{
+                body: TokenTransfer{
                     query_id: queryId,
                     amount: token_amount,
-                    from: myAddress(),
+                    sender: ctx.sender,
+                    custom_payload: emptyCell(),
                     response_destination: myAddress(),
                     forward_ton_amount: ton_amount,
                     forward_payload: emptySlice()
